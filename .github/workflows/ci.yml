@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Rust — check
+        working-directory: src-tauri
+        run: cargo check --all-targets
+
+      - name: Rust — test
+        working-directory: src-tauri
+        run: cargo test
+
+      - name: UI — install
+        working-directory: ui
+        run: npm ci || npm install
+
+      - name: UI — build
+        working-directory: ui
+        run: npm run build

@@ -1,0 +1,65 @@
+name: Release
+
+# Builds Volt for Windows and publishes installers to GitHub Releases.
+# The in-app updater reads the release list from the GitHub API, so once a
+# release is published, every installed Volt will offer the update automatically.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: npm ci || npm install
+
+      - name: Build Tauri app
+        working-directory: src-tauri
+        run: ../ui/node_modules/.bin/tauri build
+        env:
+          VOLT_GITHUB_REPO: ${{ github.repository }}
+          # Optional code signing — set these repo secrets to sign releases:
+          # TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+
+      - name: Publish GitHub Release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Volt ${{ github.ref_name }}"
+          releaseBody: |
+            ## ⚡ Volt ${{ github.ref_name }}
+
+            ### Downloads
+            - **Volt_x64-setup.exe** — Windows installer (recommended)
+            - **Volt_x64_en-US.msi** — MSI package
+
+            > Installed copies of Volt will prompt you to update automatically.
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
+          args: --config src-tauri/tauri.conf.json

@@ -1,0 +1,17 @@
+{
+  "name": "volt",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Volt — a fast, project-aware AI coding agent",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "ui:dev": "npm --prefix ui run dev",
+    "ui:build": "npm --prefix ui run build",
+    "ui:install": "npm --prefix ui install",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

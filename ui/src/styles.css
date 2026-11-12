@@ -1,0 +1,238 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* ---- Dark theme (default) ---- */
+  :root {
+    --accent-h: 262;
+    --accent: hsl(var(--accent-h) 100% 65%);
+    --accent-strong: hsl(var(--accent-h) 100% 58%);
+    --accent-soft: hsl(var(--accent-h) 100% 65% / 0.15);
+
+    /* surfaces */
+    --bg: #0a0a0f;
+    --bg-elev: #0f0f16;
+    --bg-panel: #14141d;
+    --bg-input: #1a1a26;
+    --border: rgba(255, 255, 255, 0.06);
+    --border-strong: rgba(255, 255, 255, 0.12);
+
+    /* text */
+    --fg: #e2e8f0;
+    --fg-muted: #94a3b8;
+    --fg-faint: #64748b;
+
+    color-scheme: dark;
+  }
+
+  html[data-theme="light"] {
+    --bg: #f7f7fb;
+    --bg-elev: #ffffff;
+    --bg-panel: #ffffff;
+    --bg-input: #f1f2f6;
+    --border: rgba(15, 15, 30, 0.08);
+    --border-strong: rgba(15, 15, 30, 0.16);
+
+    --fg: #1a1a26;
+    --fg-muted: #55617a;
+    --fg-faint: #8b93a7;
+
+    color-scheme: light;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    @apply font-sans antialiased;
+    background-image:
+      radial-gradient(1200px 600px at 12% -10%, hsl(var(--accent-h) 100% 65% / 0.10), transparent 60%),
+      radial-gradient(1000px 500px at 100% 0%, rgba(56, 189, 248, 0.06), transparent 55%);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--fg-faint);
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  .glass {
+    background: color-mix(in srgb, var(--bg-elev) 78%, transparent);
+    backdrop-filter: blur(16px);
+    border-color: var(--border);
+  }
+
+  /* Semantic surface helpers */
+  .surface {
+    background: var(--bg-elev);
+    color: var(--fg);
+  }
+  .surface-panel {
+    background: var(--bg-panel);
+    color: var(--fg);
+  }
+  .surface-input {
+    background: var(--bg-input);
+    color: var(--fg);
+  }
+  .bd {
+    border-color: var(--border);
+  }
+  .bd-strong {
+    border-color: var(--border-strong);
+  }
+  .tx {
+    color: var(--fg);
+  }
+  .tx-muted {
+    color: var(--fg-muted);
+  }
+  .tx-faint {
+    color: var(--fg-faint);
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-1.5
+           text-sm font-medium transition-all duration-150 select-none
+           disabled:opacity-40 disabled:pointer-events-none;
+  }
+
+  .btn-primary {
+    @apply btn text-white;
+    background: var(--accent-strong);
+  }
+  .btn-primary:hover {
+    background: var(--accent);
+    box-shadow: 0 0 20px -4px var(--accent-soft);
+  }
+
+  .btn-ghost {
+    @apply btn;
+    color: var(--fg-muted);
+  }
+  .btn-ghost:hover {
+    background: var(--accent-soft);
+    color: var(--fg);
+  }
+
+  .input {
+    @apply w-full rounded-lg border px-3 py-2 text-sm outline-none transition;
+    background: var(--bg-input);
+    color: var(--fg);
+    border-color: var(--border-strong);
+  }
+  .input::placeholder {
+    color: var(--fg-faint);
+  }
+  .input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  .label {
+    @apply text-xs font-medium uppercase tracking-wide;
+    color: var(--fg-muted);
+  }
+
+  .card {
+    @apply rounded-xl border p-4;
+    background: var(--bg-panel);
+    border-color: var(--border);
+  }
+
+  .accent-text {
+    color: var(--accent);
+  }
+  .accent-bg {
+    background: var(--accent-strong);
+  }
+  .accent-border {
+    border-color: var(--accent);
+  }
+  .accent-soft-bg {
+    background: var(--accent-soft);
+  }
+}
+
+/* Markdown tweaks inside chat bubbles */
+.prose-volt pre {
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.6;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.prose-volt code:not(pre code) {
+  background: var(--bg-input);
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.85em;
+  font-family: "JetBrains Mono", monospace;
+}
+.prose-volt pre code {
+  background: transparent;
+  padding: 0;
+  color: var(--fg);
+}
+.prose-volt a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-volt ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.prose-volt ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+}
+.prose-volt h1,
+.prose-volt h2,
+.prose-volt h3 {
+  font-weight: 600;
+  color: var(--fg);
+  margin: 1rem 0 0.5rem;
+}
+.prose-volt p {
+  margin: 0.5rem 0;
+  line-height: 1.65;
+}
+.prose-volt table {
+  width: 100%;
+  font-size: 0.875rem;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+}
+.prose-volt th,
+.prose-volt td {
+  border: 1px solid var(--border-strong);
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+}

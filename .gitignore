@@ -1,0 +1,26 @@
+# Rust
+/target
+**/*.rs.bk
+# NOTE: Cargo.lock is intentionally committed for this application (reproducible builds).
+
+# Node
+node_modules
+/ui/dist
+/ui/node_modules
+
+# Tauri
+/src-tauri/target
+/src-tauri/gen
+
+# Env / secrets
+.env
+*.key
+secrets/
+
+# IDE / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+desktop.ini

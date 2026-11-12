@@ -1,0 +1,21 @@
+# NSIS Thai language strings for the Volt installer.
+# Reference: https://github.com/kichik/nsis/blob/master/Contrib/Language%20files/Thai.nlf
+
+LangString addOrReinstall ${LANG_THAI} "เพิ่มหรือติดตั้งใหม่"
+LangString alreadyInstalled ${LANG_THAI} "ติดตั้งแล้ว"
+LangString alreadyInstalledLong ${LANG_THAI} "โปรแกรม ${PRODUCTNAME} ${VERSION} ถูกติดตั้งอยู่แล้ว กรุณาเลือกตัวเลือกด้านล่างและคลิกถัดไปเพื่อดำเนินการต่อ"
+LangString appRunning ${LANG_THAI} "โปรแกรม ${PRODUCTNAME} กำลังทำงานอยู่ กรุณาปิดโปรแกรมก่อนแล้วคลิกตกลงเพื่อดำเนินการต่อ"
+LangString appRunningOkKill ${LANG_THAI} "โปรแกรม ${PRODUCTNAME} กำลังทำงานอยู่$\nคลิกตกลงเพื่อปิดโปรแกรม"
+LangString chooseMaintenanceOption ${LANG_THAI} "เลือกตัวเลือกการบำรุงรักษาที่ต้องการ"
+LangString choowAppLocation ${LANG_THAI} "เลือกตำแหน่งที่จะติดตั้งโปรแกรม"
+LangString currentlyInstalled ${LANG_THAI} "ติดตั้งอยู่ในปัจจุบัน"
+LangString desktopShortcut ${LANG_THAI} "สร้างทางลัดบนเดสก์ท็อป"
+LangString dirContainsFiles ${LANG_THAI} "โฟลเดอร์ที่เลือกมีไฟล์อยู่แล้ว การติดตั้งอาจเขียนทับไฟล์เหล่านี้"
+LangString mainBinaryInUse ${LANG_THAI} "ไฟล์โปรแกรมหลักกำลังถูกใช้งาน กรุณาปิดโปรแกรมก่อนติดตั้ง"
+LangString noInstallModeInstalled ${LANG_THAI} "ดูเหมือนว่า ${PRODUCTNAME} ยังไม่ได้ติดตั้งในโหมดนี้ กรุณาเลือกโหมดอื่น"
+LangString noMainBinary ${LANG_THAI} "ไม่พบไฟล์โปรแกรมหลัก กรุณาตรวจสอบว่าติดตั้งในตำแหน่งที่ถูกต้อง"
+LangString oldVersionInstalled ${LANG_THAI} "ตรวจพบเวอร์ชันเก่าของ ${PRODUCTNAME}$\nจะทำการอัปเดตเป็นเวอร์ชัน ${VERSION}"
+LangString removePreviousInstallation ${LANG_THAI} "ลบการติดตั้งเวอร์ชันก่อนหน้า"
+LangString uninstallingPrevious ${LANG_THAI} "กำลังถอนการติดตั้งเวอร์ชันก่อนหน้า…"
+LangString welcomePageTitle ${LANG_THAI} "ยินดีต้อนรับสู่การติดตั้ง ${PRODUCTNAME}"
+LangString welcomePageText ${LANG_THAI} "ตัวช่วยนี้จะนำคุณผ่านการติดตั้ง ${PRODUCTNAME} เวอร์ชัน ${VERSION}$\n\nคลิกถัดไปเพื่อดำเนินการต่อ"
