@@ -63,3 +63,6 @@ parking_lot = "0.12"
 # this feature is used for production builds or when a dev server is not specified
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+
+[dev-dependencies]
+tempfile = "3"

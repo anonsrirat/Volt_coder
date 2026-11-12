@@ -141,7 +141,7 @@ require approval before running.
 ## 🧪 Testing
 
 ```bash
-cd src-tauri && cargo test      # 13 unit tests
+cd src-tauri && cargo test      # 17 unit tests
 cd ui && npm run build          # typecheck + bundle
 ```
 

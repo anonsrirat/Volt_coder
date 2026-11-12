@@ -8,7 +8,6 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 
 export function AboutTab() {
   const t = useT();
-  const { auto_check_updates } = { auto_check_updates: true };
   const { setUpdate } = useSettingsStore();
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [update, setLocalUpdate] = useState<UpdateInfo | null>(null);

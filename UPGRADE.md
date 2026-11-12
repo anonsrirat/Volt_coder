@@ -126,3 +126,51 @@ powershell -ExecutionPolicy Bypass -File generate-installer-art.ps1
   update flow to work.
 - If a feature that needs a network call (update check, MCP connect) fails, the
   app logs a warning and continues — nothing blocks startup.
+
+---
+
+# ⚡ Volt v0.2.1 — What's new
+
+A smaller, focused release: reasoning controls, a policy-driven approval gate
+and a calmer chat.
+
+## 1. 🧠 Thinking level
+
+- Pick **Auto · Off · Low · Medium · High** from the composer (brain icon).
+- Sent to each provider on its native knob:
+  - OpenAI-compatible → `reasoning_effort`
+  - Gemini → `generationConfig.thinkingConfig.thinkingBudget`
+  - Anthropic → `thinking.budget_tokens` (with an auto-lifted `max_tokens`)
+- `Auto` omits the field so the model defaults apply.
+
+**Files:** `src-tauri/src/ai/types.rs` (`ThinkingLevel`), `ai/{openai,gemini,anthropic}.rs`,
+`agent/mod.rs`, `ui/src/components/ChatPanel.tsx`
+
+## 2. 🗜️ Context meter
+
+- Live `used / window · %` bar under the composer; goes amber near the
+  compaction threshold.
+- Compaction still emits `ai://compacted`; the notice now persists for the turn.
+- New command: `context_tokens(messages, provider_id)`.
+
+## 3. 🛡️ Approval policy is honoured
+
+- `ApprovalPolicy::needs_approval(tool_name, fallback)` maps your Settings
+  toggles onto the gate. MCP/unknown tools fall back to the tool default.
+- Approval requests now carry a `preview`: a numbered file preview, a real
+  **unified diff** for `apply_patch`, or the command line.
+
+**Files:** `src-tauri/src/config.rs`, `agent/mod.rs`, `ui/src/components/ApprovalCard.tsx`
+
+## 4. 🐛 Fixes
+
+- Explorer no longer blank after restart (`current_project` re-scans the tree).
+- `prompt.rs` build break (`build_thinking_section` was missing).
+- Dead code removed; `ConfigStore` now uses `parking_lot` like the rest of state.
+
+## 5. 🎨 Chat polish
+
+- Auto-growing composer, collapsible tool/reasoning rows, copy button,
+  smarter collapsed tool summaries, keyboard hints, sticky auto-scroll.
+
+**Tests:** 17/17 passing (`cd src-tauri && cargo test`).

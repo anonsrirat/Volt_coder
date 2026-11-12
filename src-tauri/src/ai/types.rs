@@ -126,9 +126,7 @@ pub struct ToolSpec {
     pub description: String,
     /// JSON Schema object describing the parameters.
     pub parameters: serde_json::Value,
-}
-
-/// A concrete tool invocation produced by the model.
+}/// A concrete tool invocation produced by the model.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolCall {
     pub id: String,
@@ -163,4 +161,27 @@ pub enum StreamEvent {
     Done,
     /// A fatal error mid-stream.
     Error { message: String },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_thinking_levels() {
+        assert_eq!(ThinkingLevel::parse("auto"), ThinkingLevel::Auto);
+        assert_eq!(ThinkingLevel::parse("MEDIUM"), ThinkingLevel::Medium);
+        assert_eq!(ThinkingLevel::parse(" high "), ThinkingLevel::High);
+        assert_eq!(ThinkingLevel::parse("minimal"), ThinkingLevel::Low);
+        assert_eq!(ThinkingLevel::parse("bogus"), ThinkingLevel::Off);
+    }
+
+    #[test]
+    fn thinking_budgets_and_effort() {
+        assert_eq!(ThinkingLevel::Off.budget_tokens(), 0);
+        assert!(ThinkingLevel::Off.effort().is_none());
+        assert_eq!(ThinkingLevel::Medium.budget_tokens(), 4_096);
+        assert_eq!(ThinkingLevel::High.effort(), Some("high"));
+        assert_eq!(ThinkingLevel::Auto.as_str(), "auto");
+    }
 }

@@ -57,3 +57,50 @@ impl Tool for ApplyPatch {
         Ok(ToolResult::ok(format!("patched {rel}\n{summary}")))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ctx_for(dir: &std::path::Path) -> ProjectContext {
+        let mut ctx = ProjectContext::new();
+        ctx.open(dir).unwrap();
+        ctx
+    }
+
+    #[tokio::test]
+    async fn apply_patch_replaces_exact_block() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.txt"), "hello world\n").unwrap();
+        let ctx = ctx_for(dir.path());
+
+        let out = ApplyPatch
+            .run(
+                json!({ "path": "a.txt", "search": "world", "replace": "volt" }),
+                &ctx,
+            )
+            .await
+            .unwrap();
+
+        assert!(!out.is_error);
+        assert!(out.content.contains("patched a.txt"));
+        assert!(out.content.contains("-hello world") || out.content.contains("world"));
+        let written = std::fs::read_to_string(dir.path().join("a.txt")).unwrap();
+        assert_eq!(written, "hello volt\n");
+    }
+
+    #[tokio::test]
+    async fn apply_patch_errors_when_block_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.txt"), "hello\n").unwrap();
+        let ctx = ctx_for(dir.path());
+
+        let out = ApplyPatch
+            .run(json!({ "path": "a.txt", "search": "nope", "replace": "x" }), &ctx)
+            .await
+            .unwrap();
+
+        assert!(out.is_error);
+        assert!(out.content.contains("not found"));
+    }
+}
