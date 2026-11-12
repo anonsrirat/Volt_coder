@@ -167,7 +167,10 @@ export function ChatPanel() {
           </div>
 
           <ContextMeter info={contextInfo} />
-          <p className="mt-2 text-[11px] tx-faint text-center">{t("chat.note")}</p>
+          <p className="mt-2 text-[11px] tx-faint text-center">
+            {t("chat.note")} · <kbd className="tx-muted">Enter</kbd> {t("chat.sendKey")} ·{" "}
+            <kbd className="tx-muted">Shift+Enter</kbd> {t("chat.newlineKey")}
+          </p>
         </div>
       </div>
     </section>

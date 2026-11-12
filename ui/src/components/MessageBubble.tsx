@@ -1,7 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import clsx from "clsx";
-import { Brain, ChevronRight, Wrench, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Brain, ChevronRight, Wrench, CheckCircle2, XCircle, Loader2, Copy, Check } from "lucide-react";
 import { useState } from "react";
 import type { Message } from "../lib/types";
 import type { ToolCard } from "../lib/store";
@@ -38,17 +38,20 @@ export function MessageBubble({ message, live, reasoning, toolCards }: Props) {
         {message.content?.trim() && (
           <div
             className={clsx(
-              "rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+              "group/msg relative rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
               isUser ? "accent-bg text-white rounded-tr-sm" : "surface-panel border bd tx rounded-tl-sm",
             )}
           >
             {isUser ? (
               <span className="whitespace-pre-wrap">{message.content}</span>
             ) : (
-              <div className="prose-volt">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
-                {live && <Caret />}
-              </div>
+              <>
+                <CopyButton text={message.content} />
+                <div className="prose-volt">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                  {live && <Caret />}
+                </div>
+              </>
             )}
           </div>
         )}
@@ -94,7 +97,7 @@ function ToolCardView({ card }: { card: ToolCard }) {
         {status}
         <Wrench size={12} className="accent-text/70" />
         <span className="font-mono tx">{card.name}</span>
-        <span className="tx-faint truncate flex-1 text-left">{summarizeArgs(card.arguments)}</span>
+        <span className="tx-faint truncate flex-1 text-left">{summarizeArgs(card.name, card.arguments)}</span>
         <ChevronRight
           size={13}
           className={clsx("tx-faint transition-transform", open && "rotate-90")}
@@ -180,8 +183,40 @@ function Thinking() {
   );
 }
 
-function summarizeArgs(args: Record<string, unknown>): string {
-  const first = Object.values(args)[0];
-  if (typeof first === "string") return first.slice(0, 60);
+function summarizeArgs(name: string, args: Record<string, unknown>): string {
+  // Prefer the most informative field for known tools.
+  const pick =
+    name === "run_command"
+      ? args.command
+      : name === "apply_patch"
+        ? args.path
+        : name === "read_file" || name === "write_file" || name === "list_dir"
+          ? args.path
+          : name === "grep"
+            ? args.pattern
+            : Object.values(args)[0];
+  if (typeof pick === "string") return pick.length > 64 ? `${pick.slice(0, 64)}...` : pick;
   return "";
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [done, setDone] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setDone(true);
+      setTimeout(() => setDone(false), 1200);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+  return (
+    <button
+      onClick={copy}
+      title="Copy"
+      className="absolute right-2 top-2 rounded-md p-1 opacity-0 group-hover/msg:opacity-100 surface-input border bd tx-faint hover:tx transition"
+    >
+      {done ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+    </button>
+  );
 }
