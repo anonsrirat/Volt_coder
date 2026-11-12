@@ -22,7 +22,9 @@
 |---|---|
 | 🔌 **Any provider** | OpenAI, Anthropic, Gemini, OpenRouter, Groq, DeepSeek, Ollama, LM Studio, vLLM… any OpenAI-compatible endpoint + fully custom base URL/headers |
 | 🛠️ **Real agent tools** | `read_file`, `write_file`, `apply_patch`, `list_dir`, `grep`, `run_command` |
-| 🛡️ **Approval gate** | Every file write / shell command must be approved by you (with diff preview) |
+| 🛡️ **Approval gate** | Every file write / shell command must be approved by you (with a numbered preview or a real unified diff) |
+| 🧠 **Thinking level** | Per-message reasoning depth (Auto · Off · Low · Medium · High) sent to the model |
+| 🗜️ **Context meter** | Live token-usage bar + compaction notice, right under the composer |
 | 🔐 **Secure keys** | API keys live in the OS credential store — never on disk in plaintext |
 | ⚡ **Streaming** | Responses stream token-by-token over Tauri events |
 | 💾 **Persistent** | Chat sessions & messages stored in SQLite |
@@ -139,7 +141,7 @@ require approval before running.
 ## 🧪 Testing
 
 ```bash
-cd src-tauri && cargo test      # 11 unit tests
+cd src-tauri && cargo test      # 13 unit tests
 cd ui && npm run build          # typecheck + bundle
 ```
 

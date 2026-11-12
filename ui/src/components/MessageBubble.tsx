@@ -122,11 +122,21 @@ function ToolCardView({ card }: { card: ToolCard }) {
 }
 
 function ToolMessage({ message }: { message: Message }) {
+  const firstLine = message.content.split("\n").find((l) => l.trim()) ?? "";
+  const summary = firstLine.length > 80 ? `${firstLine.slice(0, 80)}…` : firstLine;
   return (
     <div className="pl-11 pr-4 py-1">
-      <div className="text-xs font-mono tx-faint border-l-2 accent-border pl-3 py-1 whitespace-pre-wrap max-h-40 overflow-y-auto">
-        {message.content}
-      </div>
+      <details className="group">
+        <summary className="flex items-center gap-1.5 text-xs font-mono tx-faint cursor-pointer list-none select-none hover:tx-muted">
+          <ChevronRight size={12} className="shrink-0 transition-transform group-open:rotate-90" />
+          <Wrench size={12} className="shrink-0 accent-text/70" />
+          <span className="truncate">{message.name ?? "tool"}</span>
+          <span className="truncate tx-faint/70">{summary}</span>
+        </summary>
+        <pre className="mt-1 text-xs font-mono tx-faint border-l-2 accent-border pl-3 py-1 whitespace-pre-wrap max-h-60 overflow-y-auto">
+          {message.content}
+        </pre>
+      </details>
     </div>
   );
 }
