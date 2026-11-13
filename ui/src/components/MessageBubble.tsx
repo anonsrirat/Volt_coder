@@ -3,8 +3,10 @@ import remarkGfm from "remark-gfm";
 import clsx from "clsx";
 import { Brain, ChevronRight, Wrench, CheckCircle2, XCircle, Loader2, Copy, Check } from "lucide-react";
 import { useState } from "react";
-import type { Message } from "../lib/types";
+import type { Message, ToolCall } from "../lib/types";
 import type { ToolCard } from "../lib/store";
+import { useSettingsStore } from "../lib/store";
+import { useT } from "../lib/i18n";
 
 interface Props {
   message: Message;
@@ -14,8 +16,15 @@ interface Props {
 }
 
 export function MessageBubble({ message, live, reasoning, toolCards }: Props) {
+  const showToolActivity = useSettingsStore(
+    (s) => s.settings?.show_tool_activity ?? false,
+  );
+  const t = useT();
   const isUser = message.role === "user";
-  if (message.role === "tool") return <ToolMessage message={message} />;
+
+  if (message.role === "tool") {
+    return showToolActivity ? <ToolMessage message={message} /> : null;
+  }
 
   return (
     <div className={clsx("flex gap-3 py-3 animate-fade-in", isUser && "flex-row-reverse")}>
@@ -62,20 +71,88 @@ export function MessageBubble({ message, live, reasoning, toolCards }: Props) {
           </div>
         )}
 
-        {toolCards?.map((c) => (
-          <ToolCardView key={c.id} card={c} />
-        ))}
+        {showToolActivity &&
+          toolCards?.map((c) => <ToolCardView key={c.id} card={c} />)}
 
-        {!live &&
-          message.tool_calls?.map((tc) => (
-            <div key={tc.id} className="text-xs tx-faint flex items-center gap-1.5 font-mono">
-              <Wrench size={12} className="accent-text/70" />
-              {tc.name}
-            </div>
-          ))}
+        {!showToolActivity && live && (toolCards?.length ?? 0) > 0 && (
+          <div className="flex items-center gap-1.5 text-xs tx-faint">
+            <Loader2 size={12} className="animate-spin accent-text" />
+            <span>{t("chat.working")}</span>
+          </div>
+        )}
+
+        {!live && (message.tool_calls?.length ?? 0) > 0 && (
+          showToolActivity ? (
+            message.tool_calls!.map((tc) => (
+              <div key={tc.id} className="text-xs tx-faint flex items-center gap-1.5 font-mono">
+                <Wrench size={12} className="accent-text/70" />
+                {tc.name}
+              </div>
+            ))
+          ) : (
+            <ActionSummary calls={message.tool_calls!} />
+          )
+        )}
       </div>
     </div>
   );
+}
+
+/** Compact, single-line summary of everything the agent did in a turn. */
+function ActionSummary({ calls }: { calls: ToolCall[] }) {
+  const t = useT();
+  const stats = actionStats(calls);
+  const parts: string[] = [];
+  const edited = stats.files > 0 ? stats.files : stats.edits;
+  if (edited) parts.push(t("summary.files", { n: edited }));
+  if (stats.commands) parts.push(t("summary.commands", { n: stats.commands }));
+  if (stats.searches) parts.push(t("summary.searches", { n: stats.searches }));
+  if (stats.reads) parts.push(t("summary.reads", { n: stats.reads }));
+  const rest = stats.total - stats.edits - stats.commands - stats.searches - stats.reads;
+  if (rest > 0) parts.push(t("summary.other", { n: rest }));
+
+  return (
+    <div className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border bd surface-panel px-3 py-1.5 text-[11px] tx-muted">
+      <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+      <span className="font-medium tx">{t("summary.actions", { n: stats.total })}</span>
+      {parts.map((p) => (
+        <span key={p} className="tx-faint">
+          · {p}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+interface ActionStats {
+  total: number;
+  files: number;
+  edits: number;
+  commands: number;
+  reads: number;
+  searches: number;
+}
+
+function actionStats(calls: ToolCall[]): ActionStats {
+  const files = new Set<string>();
+  let edits = 0;
+  let commands = 0;
+  let reads = 0;
+  let searches = 0;
+  for (const c of calls) {
+    if (c.name === "write_file" || c.name === "apply_patch") {
+      edits += 1;
+      const p = c.arguments?.path;
+      if (typeof p === "string") files.add(p);
+    } else if (c.name === "run_command") {
+      commands += 1;
+    } else if (c.name === "grep") {
+      searches += 1;
+    } else if (c.name === "read_file" || c.name === "list_dir") {
+      reads += 1;
+    }
+  }
+  return { total: calls.length, files: files.size, edits, commands, reads, searches };
 }
 
 function ToolCardView({ card }: { card: ToolCard }) {

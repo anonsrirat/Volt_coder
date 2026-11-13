@@ -80,6 +80,8 @@ export interface SessionDetail {
 export type ThemeMode = "dark" | "light" | "system";
 
 export interface ApprovalPolicy {
+  /** Master switch: run every tool without a prompt. */
+  full_access: boolean;
   write_file: boolean;
   run_command: boolean;
   read_file: boolean;
@@ -128,6 +130,8 @@ export interface Settings {
   approval: ApprovalPolicy;
   compaction: CompactionConfig;
   max_iterations: number;
+  /** When true, show every tool action in the chat. Default false. */
+  show_tool_activity: boolean;
   auto_check_updates: boolean;
   last_update_check: number;
   mcp_servers: McpServerConfig[];
@@ -205,6 +209,25 @@ export interface CompactedEvent {
   session_id: string;
   summarised: number;
   tokens_before: number;
+}
+
+// --- live phase timeline ---
+
+export type PhaseStatus = "running" | "done" | "error";
+
+export interface PhaseEvent {
+  session_id: string;
+  id: string;
+  /** `thinking` | `reading` | `editing` | `running` | `searching` | `working` | `done` */
+  phase: string;
+  detail: string;
+  status: PhaseStatus;
+}
+
+export interface NoticeEvent {
+  session_id?: string;
+  kind?: string;
+  message: string;
 }
 
 // --- thinking / reasoning depth ---

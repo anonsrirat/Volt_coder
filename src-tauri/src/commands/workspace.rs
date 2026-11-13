@@ -8,27 +8,44 @@ use std::sync::Arc;
 use tauri::State;
 
 #[tauri::command]
-pub fn open_project(path: String, state: State<'_, Arc<AppState>>) -> Result<ProjectInfo> {
-    let mut ctx = state.context.write();
-    let info = ctx.open(path)?;
+pub async fn open_project(path: String, state: State<'_, Arc<AppState>>) -> Result<ProjectInfo> {
+    // Canonicalise + scan off the UI thread so a large folder never freezes
+    // the window.
+    let info = tokio::task::spawn_blocking(move || crate::workspace::scan_project(path))
+        .await
+        .map_err(|e| AppError::Other(format!("project scan failed: {e}")))??;
+
+    {
+        let mut ctx = state.context.write();
+        ctx.set_root(std::path::PathBuf::from(&info.root));
+    }
     // Persist the last-opened project.
     state.config.update(|s| s.workspace_root = Some(info.root.clone()))?;
     Ok(info)
 }
 
 #[tauri::command]
-pub fn current_project(state: State<'_, Arc<AppState>>) -> Result<Option<ProjectInfo>> {
-    let ctx = state.context.read();
-    let Some(root) = ctx.root_path() else {
+pub async fn current_project(state: State<'_, Arc<AppState>>) -> Result<Option<ProjectInfo>> {
+    let root = { state.context.read().root_path().cloned() };
+    let Some(root) = root else {
         return Ok(None);
     };
     let name = root
         .file_name()
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_default();
+
     // Re-scan so the explorer is populated after a restart (the in-memory
-    // context is empty until something opens the project again).
-    let tree = ctx.tree().unwrap_or_default();
+    // context is empty until something opens the project again). Do it on a
+    // blocking thread and only one level deep.
+    let scan_root = root.clone();
+    let tree = tokio::task::spawn_blocking(move || {
+        crate::workspace::scan_tree(&scan_root, crate::workspace::EAGER_DEPTH)
+    })
+    .await
+    .map_err(|e| AppError::Other(format!("project scan failed: {e}")))?
+    .unwrap_or_default();
+
     Ok(Some(ProjectInfo {
         root: root.to_string_lossy().to_string(),
         name,

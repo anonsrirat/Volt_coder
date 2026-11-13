@@ -22,6 +22,8 @@ pub struct SettingsPatch {
     #[serde(default)]
     pub max_iterations: Option<u32>,
     #[serde(default)]
+    pub show_tool_activity: Option<bool>,
+    #[serde(default)]
     pub auto_check_updates: Option<bool>,
     #[serde(default)]
     pub approval: Option<crate::config::ApprovalPolicy>,
@@ -42,7 +44,10 @@ pub fn update_settings(patch: SettingsPatch, state: State<'_, Arc<AppState>>) ->
             s.language = v;
         }
         if let Some(v) = patch.max_iterations {
-            s.max_iterations = v;
+            s.max_iterations = v.clamp(5, 200);
+        }
+        if let Some(v) = patch.show_tool_activity {
+            s.show_tool_activity = v;
         }
         if let Some(v) = patch.auto_check_updates {
             s.auto_check_updates = v;

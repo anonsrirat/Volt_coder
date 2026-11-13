@@ -33,10 +33,23 @@ impl AppState {
         let sessions = SessionStore::open(&dir.join("sessions.db"))
             .expect("failed to open sessions database");
 
+        // Restore the last workspace root (without scanning it). The scan
+        // happens lazily in `current_project` on a blocking worker, so a huge
+        // project does not delay startup.
+        let mut context = ProjectContext::new();
+        if let Some(root) = config.get().workspace_root.as_deref() {
+            let path = std::path::Path::new(root);
+            if path.is_dir() {
+                if let Ok(canonical) = path.canonicalize() {
+                    context.set_root(canonical);
+                }
+            }
+        }
+
         Self {
             config,
             sessions,
-            context: RwLock::new(ProjectContext::new()),
+            context: RwLock::new(context),
             tools: Arc::new(ToolRegistry::default_set()),
             mcp: Arc::new(McpRegistry::new()),
             cancellations: RwLock::new(HashMap::new()),

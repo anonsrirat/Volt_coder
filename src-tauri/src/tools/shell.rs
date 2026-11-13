@@ -27,7 +27,8 @@ impl Tool for RunCommand {
         ToolSpec {
             name: "run_command".into(),
             description: "Run a shell command with the project root as the working directory. \
-                          Requires approval. Times out after 60s."
+                          Captures stdout and stderr. Times out after 120s unless \
+                          `timeout_secs` is set."
                 .into(),
             parameters: json!({
                 "type": "object",
@@ -44,7 +45,7 @@ impl Tool for RunCommand {
             .as_str()
             .ok_or_else(|| AppError::Other("missing 'command'".into()))?;
         let cwd = ctx.root()?.clone();
-        let timeout = Duration::from_secs(args["timeout_secs"].as_u64().unwrap_or(60));
+        let timeout = Duration::from_secs(args["timeout_secs"].as_u64().unwrap_or(120));
 
         let lowered = command.to_lowercase();
         if BLOCKLIST.iter().any(|b| lowered.contains(b)) {
@@ -52,48 +53,44 @@ impl Tool for RunCommand {
         }
 
         let (shell, flag) = if cfg!(windows) { ("cmd", "/C") } else { ("sh", "-c") };
-        let mut child = Command::new(shell)
-            .arg(flag)
+        let mut cmd = Command::new(shell);
+        cmd.arg(flag)
             .arg(command)
             .current_dir(&cwd)
+            .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
+            // If the future is dropped on timeout, make sure the child dies
+            // with it instead of lingering in the background.
+            .kill_on_drop(true);
+
+        let child = cmd
             .spawn()
             .map_err(|e| AppError::Other(format!("spawn failed: {e}")))?;
 
-        // Take the pipes so we can read them after the process exits, while
-        // keeping `child` available for the timeout/kill path.
-        let mut stdout = child.stdout.take();
-        let mut stderr = child.stderr.take();
-
-        let status = match tokio::time::timeout(timeout, child.wait()).await {
-            Ok(Ok(status)) => status,
+        // `wait_with_output` reads stdout/stderr concurrently with waiting.
+        // The previous implementation waited first and only then drained the
+        // pipes, which deadlocked (and timed out) whenever a command emitted
+        // more than the OS pipe buffer — e.g. `npm test` or `cargo build`.
+        let output = match tokio::time::timeout(timeout, child.wait_with_output()).await {
+            Ok(Ok(out)) => out,
             Ok(Err(e)) => return Ok(ToolResult::err(format!("process error: {e}"))),
             Err(_) => {
-                let _ = child.kill().await;
-                return Ok(ToolResult::err(format!("command timed out after {}s", timeout.as_secs())));
+                return Ok(ToolResult::err(format!(
+                    "command timed out after {}s (terminated)",
+                    timeout.as_secs()
+                )));
             }
         };
 
-        use tokio::io::AsyncReadExt;
-        let mut out_buf = Vec::new();
-        let mut err_buf = Vec::new();
-        if let Some(so) = stdout.as_mut() {
-            so.read_to_end(&mut out_buf).await.ok();
-        }
-        if let Some(se) = stderr.as_mut() {
-            se.read_to_end(&mut err_buf).await.ok();
-        }
-
-        let mut combined = String::new();
-        combined.push_str(&String::from_utf8_lossy(&out_buf));
-        let err_text = String::from_utf8_lossy(&err_buf);
+        let mut combined = String::from_utf8_lossy(&output.stdout).to_string();
+        let err_text = String::from_utf8_lossy(&output.stderr);
         if !err_text.trim().is_empty() {
             combined.push_str("\n[stderr]\n");
             combined.push_str(&err_text);
         }
-        let is_error = !status.success();
-        let exit = status.code().unwrap_or(-1);
+        let is_error = !output.status.success();
+        let exit = output.status.code().unwrap_or(-1);
         let text = format!("(exit {exit})\n{combined}");
         Ok(if is_error { ToolResult::err(text) } else { ToolResult::ok(text) })
     }

@@ -6,6 +6,7 @@ import type {
   ContextInfo,
   FileNode,
   Message,
+  PhaseEvent,
   Plan,
   ProviderView,
   Session,
@@ -29,6 +30,19 @@ export interface ToolCard {
   running: boolean;
 }
 
+/** One slice of live agent progress, shown in the Canvas timeline. */
+export interface PhaseEntry {
+  id: string;
+  phase: string;
+  detail: string;
+  status: "running" | "done" | "error";
+}
+
+export interface Notice {
+  kind: string;
+  message: string;
+}
+
 interface ChatState {
   sessionId: string | null;
   sessions: Session[];
@@ -36,6 +50,8 @@ interface ChatState {
   streamingText: string;
   reasoning: string;
   toolCards: ToolCard[];
+  phases: PhaseEntry[];
+  notice: Notice | null;
   approval: ApprovalRequestEvent | null;
   usage: UsageEvent | null;
   isStreaming: boolean;
@@ -53,6 +69,8 @@ interface ChatState {
   appendReasoning: (text: string) => void;
   pushToolCall: (e: ToolCallEvent) => void;
   pushToolResult: (e: ToolResultEvent) => void;
+  upsertPhase: (e: PhaseEvent) => void;
+  setNotice: (n: Notice | null) => void;
   setApproval: (a: ApprovalRequestEvent | null) => void;
   setUsage: (u: UsageEvent) => void;
   setError: (msg: string | null) => void;
@@ -70,6 +88,8 @@ export const useChatStore = create<ChatState>((set) => ({
   streamingText: "",
   reasoning: "",
   toolCards: [],
+  phases: [],
+  notice: null,
   approval: null,
   usage: null,
   isStreaming: false,
@@ -84,7 +104,16 @@ export const useChatStore = create<ChatState>((set) => ({
     set((s) => ({ messages: [...s.messages, { role: "user", content: text }] })),
 
   begin: () =>
-    set({ isStreaming: true, streamingText: "", reasoning: "", toolCards: [], error: null, compactedNotice: null }),
+    set({
+      isStreaming: true,
+      streamingText: "",
+      reasoning: "",
+      toolCards: [],
+      phases: [],
+      notice: null,
+      error: null,
+      compactedNotice: null,
+    }),
 
   appendToken: (_sessionId, text) =>
     set((s) => ({ streamingText: s.streamingText + text })),
@@ -107,6 +136,27 @@ export const useChatStore = create<ChatState>((set) => ({
         c.id === e.id ? { ...c, result: e.result, isError: e.is_error, running: false } : c,
       ),
     })),
+
+  upsertPhase: (e) =>
+    set((s) => {
+      const entry: PhaseEntry = {
+        id: e.id,
+        phase: e.phase,
+        detail: e.detail,
+        status: e.status,
+      };
+      const idx = s.phases.findIndex((p) => p.id === entry.id);
+      if (idx === -1) {
+        const next = [...s.phases, entry];
+        // Keep the timeline bounded so a very long run cannot grow forever.
+        return { phases: next.length > 60 ? next.slice(next.length - 60) : next };
+      }
+      const next = s.phases.slice();
+      next[idx] = entry;
+      return { phases: next };
+    }),
+
+  setNotice: (notice) => set({ notice }),
 
   setApproval: (approval) => set({ approval }),
   setUsage: (usage) => set({ usage }),
@@ -147,6 +197,8 @@ export const useChatStore = create<ChatState>((set) => ({
       streamingText: "",
       reasoning: "",
       toolCards: [],
+      phases: [],
+      notice: null,
       approval: null,
       usage: null,
       error: null,
@@ -180,7 +232,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   activeFile: null,
   fileContent: null,
   language: null,
-  showCanvas: false,
+  showCanvas: true,
 
   setProject: (root, name, tree) => set({ root, name, tree }),
   setTree: (tree) => set({ tree }),

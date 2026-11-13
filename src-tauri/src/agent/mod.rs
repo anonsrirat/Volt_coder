@@ -10,7 +10,7 @@ use crate::error::{AppError, Result};
 use crate::state::AppState;
 use crate::tools::{ToolRegistry, ToolResult};
 use serde::Deserialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
@@ -150,16 +150,47 @@ impl AgentLoop {
         }
 
         let mut iteration = 0;
+        // Guard against a model that keeps replaying the exact same tool call.
+        let mut last_signature: Option<String> = None;
+        let mut repeats = 0u32;
+        // Count identical calls across the whole turn: a model that alternates
+        // between the same few failing actions is still a loop.
+        let mut call_counts: HashMap<String, u32> = HashMap::new();
+
         loop {
             if self.cancel.is_cancelled() {
-                self.emit("ai://error", serde_json::json!({ "message": "cancelled" }));
-                return Err(AppError::Cancelled);
+                self.emit_phase(session_id, "run", "done", "", "error");
+                self.emit(
+                    "ai://notice",
+                    serde_json::json!({
+                        "session_id": session_id,
+                        "kind": "cancelled",
+                        "message": "stopped",
+                    }),
+                );
+                self.emit("ai://done", serde_json::json!({ "session_id": session_id }));
+                return Ok(());
             }
             if iteration >= self.max_iterations {
-                self.emit("ai://error", serde_json::json!({ "message": "max iterations reached" }));
-                break;
+                // A hard error here used to leave a scary "max iterations
+                // reached" banner in the chat. Treat the limit as a normal
+                // stop: report a friendly notice and finish the turn.
+                self.emit_phase(session_id, "run", "done", "", "done");
+                self.emit(
+                    "ai://notice",
+                    serde_json::json!({
+                        "session_id": session_id,
+                        "kind": "max_iterations",
+                        "message": format!("stopped after {} steps", self.max_iterations),
+                    }),
+                );
+                self.emit("ai://done", serde_json::json!({ "session_id": session_id }));
+                return Ok(());
             }
             iteration += 1;
+
+            let think_id = format!("think-{iteration}");
+            self.emit_phase(session_id, &think_id, "thinking", "", "running");
 
             // 2. Ask the provider to stream a completion.
             let (tx, mut rx) = mpsc::channel::<StreamEvent>(64);
@@ -204,6 +235,7 @@ impl AgentLoop {
                 }
             }
             let _ = producer.await;
+            self.emit_phase(session_id, &think_id, "thinking", "", "done");
 
             // 3. Persist the assistant message.
             let mut assistant_msg = Message::assistant(assistant_text.clone());
@@ -213,13 +245,63 @@ impl AgentLoop {
 
             if completed_calls.is_empty() {
                 // No more tools — we're done.
+                self.emit_phase(session_id, "run", "done", "", "done");
+                self.emit("ai://done", serde_json::json!({ "session_id": session_id }));
+                break;
+            }
+
+            // Duplicate-call guard: if the model asks for the exact same batch
+            // three times in a row, stop instead of burning iterations.
+            let signature = completed_calls
+                .iter()
+                .map(|c| format!("{}:{}", c.name, c.arguments))
+                .collect::<Vec<_>>()
+                .join("|");
+            if last_signature.as_deref() == Some(signature.as_str()) {
+                repeats += 1;
+            } else {
+                repeats = 0;
+                last_signature = Some(signature);
+            }
+            if repeats >= 2 {
+                self.emit_phase(session_id, "run", "done", "", "done");
+                self.emit(
+                    "ai://notice",
+                    serde_json::json!({
+                        "session_id": session_id,
+                        "kind": "loop_guard",
+                        "message": "the same action repeated",
+                    }),
+                );
                 self.emit("ai://done", serde_json::json!({ "session_id": session_id }));
                 break;
             }
 
             // 4. Execute each requested tool (with approval if required).
+            let mut loop_detected = false;
             for call in &completed_calls {
+                let key = format!("{}:{}", call.name, call.arguments);
+                let count = call_counts.entry(key).or_insert(0);
+                *count += 1;
+                if *count > 4 {
+                    loop_detected = true;
+                    break;
+                }
+
+                let (phase, detail) = describe_tool(&call.name, &call.arguments);
+                let phase_id = format!("{iteration}-{}", call.id);
+                self.emit_phase(session_id, &phase_id, phase, &detail, "running");
+
                 let result = self.execute_tool(session_id, call).await?;
+
+                self.emit_phase(
+                    session_id,
+                    &phase_id,
+                    phase,
+                    &detail,
+                    if result.is_error { "error" } else { "done" },
+                );
+
                 let tool_msg = Message {
                     role: Role::Tool,
                     content: result.content,
@@ -229,6 +311,20 @@ impl AgentLoop {
                 };
                 messages.push(tool_msg.clone());
                 self.state.sessions.append_message(session_id, &tool_msg)?;
+            }
+
+            if loop_detected {
+                self.emit_phase(session_id, "run", "done", "", "done");
+                self.emit(
+                    "ai://notice",
+                    serde_json::json!({
+                        "session_id": session_id,
+                        "kind": "loop_guard",
+                        "message": "the same action repeated",
+                    }),
+                );
+                self.emit("ai://done", serde_json::json!({ "session_id": session_id }));
+                break;
             }
             // loop back → send tool results to the model.
         }
@@ -256,7 +352,11 @@ impl AgentLoop {
 
         // Approval gate — driven by the user's policy in Settings, falling back
         // to the tool's own default so unknown/MCP tools stay safe.
-        let needs_approval = is_mcp || self.approval.needs_approval(&call.name, tool);
+        let needs_approval = if self.approval.full_access {
+            false
+        } else {
+            is_mcp || self.approval.needs_approval(&call.name, tool)
+        };
         if needs_approval {
             let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
             self.state
@@ -320,6 +420,42 @@ impl AgentLoop {
     fn emit(&self, event: &str, payload: serde_json::Value) {
         let _ = self.app.emit(event, payload);
     }
+
+    /// Publish one slice of live progress for the Canvas timeline.
+    ///
+    /// `id` is stable per action so the UI can upsert (running → done/error)
+    /// instead of appending duplicates.
+    fn emit_phase(&self, session_id: &str, id: &str, phase: &str, detail: &str, status: &str) {
+        self.emit(
+            "ai://phase",
+            serde_json::json!({
+                "session_id": session_id,
+                "id": id,
+                "phase": phase,
+                "detail": detail,
+                "status": status,
+            }),
+        );
+    }
+}
+
+/// Map a tool call onto a coarse phase + a short human-readable detail.
+fn describe_tool(name: &str, args: &serde_json::Value) -> (&'static str, String) {
+    let field = |key: &str| args[key].as_str().unwrap_or_default().to_string();
+    let clamp = |s: String| {
+        if s.chars().count() > 64 {
+            format!("{}...", s.chars().take(64).collect::<String>())
+        } else {
+            s
+        }
+    };
+    match name {
+        "read_file" | "list_dir" => ("reading", clamp(field("path"))),
+        "write_file" | "apply_patch" => ("editing", clamp(field("path"))),
+        "run_command" => ("running", clamp(field("command"))),
+        "grep" => ("searching", clamp(field("pattern"))),
+        _ => ("working", clamp(name.to_string())),
+    }
 }
 
 /// Build a human-readable preview shown in the approval prompt.
@@ -368,5 +504,41 @@ fn build_preview(tool_name: &str, args: &serde_json::Value) -> String {
 impl crate::workspace::ProjectContext {
     pub fn root_cstr(&self) -> Option<String> {
         self.root_path().map(|p| p.to_string_lossy().to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn describe_tool_maps_phases() {
+        let (phase, detail) = describe_tool("read_file", &json!({ "path": "src/main.rs" }));
+        assert_eq!(phase, "reading");
+        assert_eq!(detail, "src/main.rs");
+
+        let (phase, _) = describe_tool("apply_patch", &json!({ "path": "a.rs" }));
+        assert_eq!(phase, "editing");
+
+        let (phase, detail) = describe_tool("run_command", &json!({ "command": "cargo test" }));
+        assert_eq!(phase, "running");
+        assert_eq!(detail, "cargo test");
+
+        let (phase, detail) = describe_tool("grep", &json!({ "pattern": "TODO" }));
+        assert_eq!(phase, "searching");
+        assert_eq!(detail, "TODO");
+
+        let (phase, detail) = describe_tool("server__tool", &json!({}));
+        assert_eq!(phase, "working");
+        assert_eq!(detail, "server__tool");
+    }
+
+    #[test]
+    fn describe_tool_clamps_long_details() {
+        let long = "x".repeat(200);
+        let (_, detail) = describe_tool("run_command", &json!({ "command": long }));
+        assert!(detail.ends_with("..."));
+        assert!(detail.chars().count() <= 67);
     }
 }

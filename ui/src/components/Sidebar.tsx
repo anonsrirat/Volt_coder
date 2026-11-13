@@ -39,8 +39,8 @@ export function Sidebar() {
   async function onNewChat() {
     const s = await createSession("New chat");
     setSessions(await listSessions());
+    reset();
     setSessionId(s.id);
-    setMessages([]);
   }
 
   async function onSelect(s: Session) {

@@ -3,19 +3,24 @@ import { ChevronRight, File, Folder, FolderOpen, RefreshCw } from "lucide-react"
 import clsx from "clsx";
 import { useWorkspaceStore } from "../lib/store";
 import { useT } from "../lib/i18n";
-import { readFile, listDir, currentProject, openProject } from "../lib/ipc";
+import { readFile, listDir, currentProject } from "../lib/ipc";
 import type { FileNode } from "../lib/types";
 
 export function FileTree() {
-  const { name, tree, setProject, root, setActiveFile } = useWorkspaceStore();
+  const { name, tree, setProject, root, setActiveFile, toggleCanvas } = useWorkspaceStore();
   const t = useT();
 
   async function onRefresh() {
     if (!root) return;
     const info = await currentProject();
     if (!info) return;
-    const full = await openProject(info.root);
-    setProject(full.root, full.name, full.tree);
+    setProject(info.root, info.name, info.tree);
+  }
+
+  function onOpen(path: string, content: string, language: string) {
+    setActiveFile(path, content, language);
+    // Show the file preview instead of the Canvas when a file is opened.
+    toggleCanvas(false);
   }
 
   return (
@@ -36,7 +41,7 @@ export function FileTree() {
           </p>
         ) : (
           tree.map((node) => (
-            <TreeNode key={node.path} node={node} depth={0} onOpen={setActiveFile} />
+            <TreeNode key={node.path} node={node} depth={0} onOpen={onOpen} />
           ))
         )}
       </div>

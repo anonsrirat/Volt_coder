@@ -48,38 +48,54 @@ export default function App() {
     let unlisten: (() => void) | undefined;
     let unlistenDrop: (() => void) | undefined;
 
+    // Failsafe: never leave the boot overlay stuck behind a slow keyring or
+    // disk read. The app becomes interactive after at most ~2.5s.
+    const bootFailsafe = window.setTimeout(() => setBooting(false), 2500);
+
     (async () => {
+      // Subscribe first so no agent events are lost while data loads.
       try {
-        const settings = await getSettings();
-        setSettings(settings);
-        applyTheme(settings.theme as ThemeMode, settings.accent);
+        unlisten = await subscribeToAgentEvents();
       } catch {
-        /* ignore */
+        /* events unavailable — the UI still works */
       }
 
-      const providers = await listProviders();
+      // Load settings, providers and sessions in parallel; none depends on
+      // the other and each failure degrades gracefully.
+      const [settings, providers, sessions] = await Promise.all([
+        getSettings().catch(() => null),
+        listProviders().catch(() => []),
+        listSessions().catch(() => []),
+      ]);
+
+      if (settings) {
+        setSettings(settings);
+        applyTheme(settings.theme as ThemeMode, settings.accent);
+      }
+
       setProviders(providers);
       const active = providers.find((p) => p.is_active);
       if (active) setActiveProvider(active.id);
 
-      const sessions = await listSessions();
       setSessions(sessions);
       if (sessions[0]) setSessionId(sessions[0].id);
 
-      try {
-        const project = await currentProject();
-        if (project) setProject(project.root, project.name, project.tree);
-      } catch {
-        /* ignore */
-      }
-
-      unlisten = await subscribeToAgentEvents();
+      // Everything needed to paint is ready — drop the boot overlay.
+      window.clearTimeout(bootFailsafe);
       setBooting(false);
 
       // Seed the composer's context-usage meter.
       refreshContext();
 
-      // Auto-check updates on launch.
+      // The folder scan can be slow on huge projects, so it runs *after* the
+      // UI is interactive and updates the explorer when it lands.
+      currentProject()
+        .then((project) => {
+          if (project) setProject(project.root, project.name, project.tree);
+        })
+        .catch(() => {});
+
+      // Auto-check updates on launch (background).
       if (useSettingsStore.getState().settings?.auto_check_updates) {
         checkUpdate()
           .then((u) => {
@@ -92,6 +108,7 @@ export default function App() {
     listen("tauri://drag-drop", () => {}).then((u) => (unlistenDrop = u));
 
     return () => {
+      window.clearTimeout(bootFailsafe);
       unlisten?.();
       unlistenDrop?.();
     };

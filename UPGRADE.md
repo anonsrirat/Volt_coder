@@ -174,3 +174,75 @@ and a calmer chat.
   smarter collapsed tool summaries, keyboard hints, sticky auto-scroll.
 
 **Tests:** 17/17 passing (`cd src-tauri && cargo test`).
+
+---
+
+# ⚡ Volt v0.2.2 — What's new
+
+Full-access autonomy, a stable agent loop, a live process Canvas and a much
+faster start.
+
+## 1. 🔓 Full access by default
+
+`ApprovalPolicy.full_access` is a new master switch and defaults to **on**.
+Every tool — including MCP — runs without an approval prompt. The shell
+blocklist still refuses destructive commands.
+
+Turn it off in **Settings → General → Approval policy** to restore the
+per-action *write / run / read* toggles.
+
+**Files:** `src-tauri/src/config.rs`, `src-tauri/src/agent/mod.rs`,
+`ui/src/components/GeneralTab.tsx`
+
+## 2. 🛑 No more `max iterations reached`
+
+- Default limit **25 → 50** (existing `25` values are migrated on launch).
+- Reaching the limit emits `ai://notice` and finishes the turn calmly.
+- Duplicate-call guards stop repeating batches (3×) and repeated single calls
+  (>4×) before they burn the whole budget.
+
+**Files:** `src-tauri/src/config.rs`, `src-tauri/src/agent/mod.rs`,
+`ui/src/components/ChatPanel.tsx`
+
+## 3. 🖥️ Commands actually finish
+
+`run_command` now uses `wait_with_output` + `kill_on_drop`, reading pipes while
+the process runs. This fixes timeouts on any command that produced more output
+than the OS pipe buffer. Default timeout is 120s.
+
+**Files:** `src-tauri/src/tools/shell.rs`, `src-tauri/src/agent/prompt.rs`
+
+## 4. 🗺️ Live phase Canvas
+
+The agent emits `ai://phase` (`thinking`, `reading`, `editing`, `running`,
+`searching`, `working`, `done`). The Canvas renders the timeline when there is
+no explicit plan and appends it under the plan when there is one.
+
+- `ai://phase` → `useChatStore.phases`
+- Canvas auto-opens on send
+
+**Files:** `src-tauri/src/agent/mod.rs`, `ui/src/lib/events.ts`,
+`ui/src/lib/store.ts`, `ui/src/components/Canvas.tsx`
+
+## 5. 🙈 Tool actions hidden + summary
+
+`Settings.show_tool_activity` defaults to `false`:
+
+- tool cards and `role: tool` messages are not rendered
+- the assistant message shows one summary chip built from `message.tool_calls`
+- enable the toggle to restore the detailed view
+
+**Files:** `ui/src/components/MessageBubble.tsx`,
+`ui/src/components/GeneralTab.tsx`, `ui/src/lib/types.ts`
+
+## 6. ⚡ Faster startup
+
+- static HTML preloader in `ui/index.html` (removed in `ui/src/main.tsx`)
+- blocking Google Fonts import removed
+- settings / providers / sessions load in parallel
+- project scan moved after the first paint and limited to one level
+- `open_project` / `current_project` scan on `spawn_blocking`
+- 2.5s boot failsafe
+- window `backgroundColor` set to `#0a0a0f`
+
+**Tests:** 21/21 passing (`cd src-tauri && cargo test`).

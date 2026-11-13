@@ -96,6 +96,7 @@ export interface SettingsPatch {
   accent?: number;
   language?: string;
   max_iterations?: number;
+  show_tool_activity?: boolean;
   auto_check_updates?: boolean;
   approval?: Settings["approval"];
   compaction?: Settings["compaction"];

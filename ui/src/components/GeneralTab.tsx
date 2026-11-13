@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { SlidersHorizontal, Minimize2 } from "lucide-react";
+import clsx from "clsx";
 import type { Settings } from "../lib/types";
 import { updateSettings } from "../lib/ipc";
 import { useT } from "../lib/i18n";
@@ -30,32 +31,76 @@ export function GeneralTab() {
       <div className="card space-y-3">
         <span className="text-xs font-semibold tx">{t("general.approval")}</span>
         <Toggle
-          label={t("general.approvalWrite")}
-          checked={local.approval.write_file}
+          label={t("general.fullAccess")}
+          checked={local.approval.full_access}
           onChange={(v) => {
-            const approval = { ...local.approval, write_file: v };
+            // Turning full access off restores sensible prompts instead of
+            // leaving every flag at "don't ask".
+            const approval = v
+              ? { ...local.approval, full_access: true }
+              : {
+                  ...local.approval,
+                  full_access: false,
+                  write_file: true,
+                  run_command: true,
+                  read_file: false,
+                };
             setLocal({ ...local, approval });
             patch({ approval });
           }}
         />
+        <p className="text-[11px] tx-faint leading-snug">{t("general.fullAccessHint")}</p>
+
+        <div
+          className={clsx(
+            "space-y-3",
+            local.approval.full_access && "opacity-40 pointer-events-none",
+          )}
+        >
+          <Toggle
+            label={t("general.approvalWrite")}
+            checked={local.approval.write_file}
+            onChange={(v) => {
+              const approval = { ...local.approval, write_file: v };
+              setLocal({ ...local, approval });
+              patch({ approval });
+            }}
+          />
+          <Toggle
+            label={t("general.approvalRun")}
+            checked={local.approval.run_command}
+            onChange={(v) => {
+              const approval = { ...local.approval, run_command: v };
+              setLocal({ ...local, approval });
+              patch({ approval });
+            }}
+          />
+          <Toggle
+            label={t("general.approvalRead")}
+            checked={local.approval.read_file}
+            onChange={(v) => {
+              const approval = { ...local.approval, read_file: v };
+              setLocal({ ...local, approval });
+              patch({ approval });
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Chat transcript */}
+      <div className="card space-y-3">
+        <span className="text-xs font-semibold tx">{t("general.chat")}</span>
         <Toggle
-          label={t("general.approvalRun")}
-          checked={local.approval.run_command}
+          label={t("general.showToolActivity")}
+          checked={local.show_tool_activity}
           onChange={(v) => {
-            const approval = { ...local.approval, run_command: v };
-            setLocal({ ...local, approval });
-            patch({ approval });
+            setLocal({ ...local, show_tool_activity: v });
+            patch({ show_tool_activity: v });
           }}
         />
-        <Toggle
-          label={t("general.approvalRead")}
-          checked={local.approval.read_file}
-          onChange={(v) => {
-            const approval = { ...local.approval, read_file: v };
-            setLocal({ ...local, approval });
-            patch({ approval });
-          }}
-        />
+        <p className="text-[11px] tx-faint leading-snug">
+          {t("general.showToolActivityHint")}
+        </p>
       </div>
 
       {/* Compaction */}
@@ -109,7 +154,7 @@ export function GeneralTab() {
           <input
             type="range"
             min={5}
-            max={60}
+            max={120}
             step={5}
             value={local.max_iterations}
             onChange={(e) => setLocal({ ...local, max_iterations: Number(e.target.value) })}

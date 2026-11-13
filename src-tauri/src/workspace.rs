@@ -4,6 +4,14 @@ use crate::error::{AppError, Result};
 use serde::{Deserialize, Serialize};
 use std::path::{Component, Path, PathBuf};
 
+/// How deep the initial explorer scan goes.
+///
+/// Startup used to scan four levels eagerly, which is slow on big projects
+/// (node_modules-heavy monorepos, Rust `target` trees, ...). One level is
+/// enough to paint the explorer; deeper folders are loaded on demand through
+/// `list_dir` when the user expands them.
+pub const EAGER_DEPTH: u32 = 1;
+
 /// A node in the project file tree (sent to the UI).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileNode {
@@ -37,18 +45,14 @@ impl ProjectContext {
     }
 
     pub fn open(&mut self, path: impl Into<PathBuf>) -> Result<ProjectInfo> {
-        let root = path.into();
-        let root = root.canonicalize()?;
-        if !root.is_dir() {
-            return Err(AppError::NotFound(format!("{} is not a directory", root.display())));
-        }
-        let name = root
-            .file_name()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_else(|| root.display().to_string());
-        self.root = Some(root.clone());
-        let tree = scan_dir(&root, 0, 4)?;
-        Ok(ProjectInfo { root: root.to_string_lossy().to_string(), name, tree })
+        let info = scan_project(path)?;
+        self.root = Some(PathBuf::from(&info.root));
+        Ok(info)
+    }
+
+    /// Attach a root that has already been canonicalised/scanned.
+    pub fn set_root(&mut self, root: PathBuf) {
+        self.root = Some(root);
     }
 
     pub fn root(&self) -> Result<&PathBuf> {
@@ -66,7 +70,7 @@ impl ProjectContext {
     /// would emit a whole new `ProjectInfo` round-trip).
     pub fn tree(&self) -> Result<Vec<FileNode>> {
         let root = self.root()?;
-        scan_dir(root, 0, 4)
+        scan_dir(root, 0, EAGER_DEPTH)
     }
 
     /// Resolve a path and guarantee it stays inside the workspace root.
@@ -83,6 +87,25 @@ impl ProjectContext {
         }
         Ok(normalized)
     }
+}
+
+/// Canonicalise a directory and scan it with the default eager depth.
+pub fn scan_project(path: impl Into<PathBuf>) -> Result<ProjectInfo> {
+    let root = path.into().canonicalize()?;
+    if !root.is_dir() {
+        return Err(AppError::NotFound(format!("{} is not a directory", root.display())));
+    }
+    let name = root
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| root.display().to_string());
+    let tree = scan_dir(&root, 0, EAGER_DEPTH)?;
+    Ok(ProjectInfo { root: root.to_string_lossy().to_string(), name, tree })
+}
+
+/// Scan an already-resolved directory to `max_depth`.
+pub fn scan_tree(dir: &Path, max_depth: u32) -> Result<Vec<FileNode>> {
+    scan_dir(dir, 0, max_depth)
 }
 
 /// Collapse `.` and `..` without touching the filesystem (works pre-creation).

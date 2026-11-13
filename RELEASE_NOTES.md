@@ -1,83 +1,107 @@
-# ⚡ Volt v0.2.1 — Release Notes
+# ⚡ Volt v0.2.2 — Release Notes
 
 **Release date:** 2026-11-13
-**Focus:** reasoning controls, a clearer approval gate, a calmer chat, and a
-smoother composer.
+**Focus:** full-access autonomy, a stable agent loop, a live process Canvas and a
+much faster start.
 
 ---
 
 ## ✨ New
 
-### 🧠 Thinking level (per message)
-Pick how much the model should reason, right from the composer:
-**Auto · Off · Low · Medium · High**. The choice is sent to each provider on its
-own native knob:
+### 🔓 Full access — no approval clicks
+`Full access` is now the **default**. Volt reads, writes and runs commands
+end-to-end without interrupting you. The destructive-command blocklist
+(`rm -rf /`, `format`, `shutdown`, ...) still applies as a safety net.
 
-| Provider | Knob used |
-|---|---|
-| OpenAI-compatible | `reasoning_effort` |
-| Google Gemini | `generationConfig.thinkingConfig.thinkingBudget` |
-| Anthropic (Claude) | `thinking.budget_tokens` (with an auto-lifted `max_tokens`) |
+You can turn it off in **Settings → General → Approval policy**; the individual
+*ask before write / run / read* toggles then take over again.
 
-`Auto` leaves the field out so the model's own defaults apply.
+### 🗺️ Live phase Canvas
+The right-hand panel now shows the agent's process in real time, even when no
+explicit plan exists:
 
-### 🗜️ Context meter & compaction notice
-A live token-usage bar now sits under the composer (`used / window · %`) and
-turns amber as it approaches the compaction threshold. When auto-compaction
-fires, a *"Context compacted · N msgs"* notice appears and stays for the turn.
+- **Thinking → Reading → Editing → Running → Searching → Done**
+- each row shows the file, command or pattern being worked on
+- the current phase spins, finished phases turn green, failures turn red
+- the Canvas opens automatically when you send a message
 
-### 🔎 Real diff previews in the approval gate
-When Volt asks to change something you now see exactly what will happen:
-- `write_file` → a numbered preview of the file being created
-- `apply_patch` → a genuine **unified diff**
-- `run_command` → the command that will run
+### 📝 One summary instead of a wall of tool calls
+Reads, writes and tool actions are **hidden from the chat by default**. When a
+turn finishes you get a single compact chip, e.g.:
+
+> ✓ **14 actions** · 3 files · 2 commands · 6 reads
+
+Prefer the old behaviour? Enable **Settings → General → Show every tool action**.
 
 ---
 
 ## 🐛 Fixes
 
-- **Explorer survives a restart** — `current_project` used to return an empty
-  tree, so the file explorer was blank until you re-opened the folder. It now
-  re-scans the last workspace and repopulates on launch.
-- **The approval policy in Settings is now honoured** — the *write file /
-  run command / read file* toggles previously had no effect (approval was
-  hard-wired per tool). The gate is now driven by your policy, while MCP and
-  unknown tools stay approval-gated by default.
-- **`prompt.rs` build break** — `system_prompt` referenced a missing
-  `build_thinking_section`, so the crate did not compile. Fixed and wired up.
-- Removed dead code (`ApprovalRequest`, an unused `AgentLoop.approval` read) and
-  aligned `ConfigStore` on `parking_lot` like the rest of the app state.
+### `⚠ max iterations reached` is gone
+- The default limit was raised **25 → 50**, and existing configs still on 25 are
+  migrated automatically.
+- If a limit is ever reached the turn ends with a calm notice, **not** a red
+  error banner.
+- Two loop guards stop runaway turns early:
+  - the same tool-call batch repeating 3× in a row
+  - the same single call executing more than 4× across the turn
+
+### Commands no longer “fail” or hang
+The shell runner waited for the process to exit **before** draining stdout and
+stderr. Any command producing more than the OS pipe buffer (`npm test`,
+`cargo build`, ...) deadlocked until the timeout. Output is now read
+concurrently, so long builds complete normally.
+
+- timeout raised **60s → 120s** (per-call override still available)
+- the child is killed on timeout instead of lingering in the background
+- the system prompt now warns the model that Windows uses `cmd /C`
+- the prompt asks the model to read a failure, fix it and retry at most once —
+  never repeat the same failing action
 
 ---
 
-## 🎨 Composer & chat polish
+## ⚡ Startup speed
 
-- **Auto-growing input** — the composer expands as you type (up to ~10 lines)
-  instead of showing a single cramped line.
-- **Collapsed tool activity** — tool calls, their results and the model's
-  reasoning now fold into one-line rows you can expand on demand, so the
-  transcript stays short. Reloaded sessions collapse them too.
-- **Copy button** on assistant messages.
-- **Smarter tool summaries** — the collapsed row shows the meaningful argument
-  (path / command / pattern) rather than the first field.
-- **Keyboard hints** — `Enter` to send, `Shift+Enter` for a new line.
-- **Sticky auto-scroll** — the chat follows new output only while you're already
-  near the bottom; scroll up to read and it won't yank you back.
+- **Static HTML preloader** — the branded loader paints before the JS bundle,
+  so there is no white flash and no silent “hang”.
+- **Google Fonts removed** — the blocking `@import` to `fonts.googleapis.com`
+  was removed; Volt now uses system fonts.
+- **Parallel boot** — settings, providers and sessions load concurrently; the
+  folder scan runs *after* the window is interactive.
+- **Lazy explorer scan** — the initial tree is scanned one level deep instead of
+  four; subfolders load on demand.
+- **Blocking work moved off the UI thread** — `open_project` / `current_project`
+  scan on a blocking worker.
+- **Boot failsafe** — the overlay always disappears within ~2.5s.
+- Window background is painted `#0a0a0f` from the first frame.
+
+---
+
+## 🎨 UI polish
+
+- Canvas activity timeline with phase icons and live/failed states.
+- Settings: **Full access** toggle and **Chat transcript → Show every tool
+  action** toggle.
+- Opening a file switches the right panel from Canvas to the file preview.
+- New Thai/English strings for phases, summaries and notices.
+- Context meter, thinking picker, copy button and keyboard hints retained.
 
 ---
 
 ## 🔧 Internal
 
-- Update source default is now **`anonsrirat/Volt_coder`**.
-- Repository initialised: source, CI workflow and docs are under version control.
-- Tests: **13/13** passing.
+- `ApprovalPolicy` gained `full_access`; `Settings` gained
+  `show_tool_activity`; `max_iterations` is clamped to `5..=200`.
+- Agent emits `ai://phase` and `ai://notice` events.
+- Tests: **21/21** passing (`cd src-tauri && cargo test`).
 
 ---
 
 ## 📦 Install
 
-1. Download **`Volt_0.2.1_x64-setup.exe`** (recommended) or the `.msi`.
-2. Run the installer — existing installs will also see an in-app update banner.
+1. Download **`Volt_0.2.2_x64-setup.exe`** (recommended) or the `.msi`.
+2. Run the installer — the in-app update banner also picks this release up
+   automatically.
 
-> The updater reads GitHub Releases directly, so no signing key is required for
-> the update flow.
+> Existing `settings.json` files are migrated on first launch (full access on,
+> max iterations raised). No manual steps needed.

@@ -22,7 +22,8 @@ impl Tool for ApplyPatch {
             name: "apply_patch".into(),
             description:
                 "Replace an exact block of text in a file (surgical edit). Provide the exact \
-                 `search` string currently in the file and the `replace` string. Requires approval."
+                 `search` string currently in the file and the `replace` string. If the block \
+                 is not found, re-read the file and copy the text verbatim."
                     .into(),
             parameters: json!({
                 "type": "object",
@@ -43,7 +44,10 @@ impl Tool for ApplyPatch {
         let original = tokio::fs::read_to_string(&path).await?;
 
         if !original.contains(search) {
-            return Ok(ToolResult::err(format!("search block not found in {rel}")));
+            return Ok(ToolResult::err(format!(
+                "search block not found in {rel}. Re-read the file with read_file and copy the \
+                 exact text (including indentation and line endings), then try again."
+            )));
         }
         let updated = original.replacen(search, replace, 1);
         tokio::fs::write(&path, &updated).await?;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Send, Square, Sparkles, Minimize2, Brain, ChevronDown, Check } from "lucide-react";
-import { useChatStore, useSettingsStore } from "../lib/store";
+import { Send, Square, Sparkles, Minimize2, Brain, ChevronDown, Check, Info } from "lucide-react";
+import { useChatStore, useSettingsStore, useWorkspaceStore } from "../lib/store";
 import { useT } from "../lib/i18n";
 import { MessageBubble } from "./MessageBubble";
 import { ApprovalCard } from "./ApprovalCard";
@@ -12,7 +12,7 @@ const THINKING_LEVELS: ThinkingLevel[] = ["auto", "off", "low", "medium", "high"
 export function ChatPanel() {
   const {
     messages, streamingText, reasoning, toolCards, approval, isStreaming, sessionId,
-    error, compactedNotice, contextInfo, begin, pushUser, finish, cancel, setSessionId,
+    error, compactedNotice, contextInfo, notice, begin, pushUser, finish, cancel, setSessionId,
     setSessions, setError,
   } = useChatStore();
   const { activeProvider } = useSettingsStore();
@@ -64,6 +64,8 @@ export function ChatPanel() {
     setInput("");
     pinnedRef.current = true;
     begin();
+    // Bring the Canvas forward so the user can watch each phase live.
+    useWorkspaceStore.getState().toggleCanvas(true);
     try {
       await sendMessage(sid, text, activeProvider, thinking);
     } catch (e) {
@@ -86,6 +88,17 @@ export function ChatPanel() {
   }
 
   const empty = messages.length === 0 && !streamingText && !isStreaming;
+
+  const noticeText =
+    notice?.kind === "max_iterations"
+      ? t("notice.max_iterations")
+      : notice?.kind === "loop_guard"
+        ? t("notice.loop_guard")
+        : notice?.kind === "cancelled"
+          ? t("notice.cancelled")
+          : notice
+            ? t("notice.info", { message: notice.message })
+            : "";
 
   return (
     <section className="flex-1 min-w-0 flex flex-col">
@@ -123,6 +136,13 @@ export function ChatPanel() {
             <div className="mb-2 flex items-center gap-1.5 text-[11px] tx-faint">
               <Minimize2 size={12} className="accent-text" />
               {compactedNotice}
+            </div>
+          )}
+
+          {noticeText && (
+            <div className="mb-2 flex items-center gap-1.5 text-[11px] text-amber-300/90">
+              <Info size={12} className="shrink-0" />
+              {noticeText}
             </div>
           )}
 

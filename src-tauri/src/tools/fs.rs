@@ -54,7 +54,7 @@ impl Tool for WriteFile {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
             name: "write_file".into(),
-            description: "Create or overwrite a file with the given content. Requires user approval.".into(),
+            description: "Create or overwrite a file with the given content. Prefer `apply_patch` for small edits to existing files.".into(),
             parameters: json!({
                 "type": "object",
                 "properties": {

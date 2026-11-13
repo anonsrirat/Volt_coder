@@ -50,26 +50,40 @@ fn default_context_window() -> u32 {
 }
 
 /// Whether actions still require explicit user approval.
+///
+/// `full_access` is a master switch: when it is on, nothing is gated and the
+/// agent runs tools end-to-end without a single click. The shell blocklist in
+/// `tools::shell` still refuses destructive commands.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApprovalPolicy {
+    /// Run every tool without asking. Defaults to **on** so a fresh install
+    /// behaves like a full-access coding agent.
+    #[serde(default = "default_true")]
+    pub full_access: bool,
+    #[serde(default = "default_true")]
     pub write_file: bool,
+    #[serde(default = "default_true")]
     pub run_command: bool,
+    #[serde(default)]
     pub read_file: bool,
 }
 
 impl Default for ApprovalPolicy {
     fn default() -> Self {
-        Self { write_file: true, run_command: true, read_file: false }
+        Self { full_access: true, write_file: true, run_command: true, read_file: false }
     }
 }
 
 impl ApprovalPolicy {
     /// Apply this policy to a concrete tool name.
     ///
-    /// Known built-in tools are gated by their matching flag; MCP and any
-    /// unrecognised tool fall back to the tool's own declaration (MCP tools
-    /// always return `true`).
+    /// Full access short-circuits everything. Otherwise known built-in tools
+    /// are gated by their matching flag; MCP and any unrecognised tool fall
+    /// back to the tool's own declaration (MCP tools always return `true`).
     pub fn needs_approval(&self, tool_name: &str, tool: Option<&dyn crate::tools::Tool>) -> bool {
+        if self.full_access {
+            return false;
+        }
         match tool_name {
             "write_file" | "apply_patch" => self.write_file,
             "run_command" => self.run_command,
@@ -85,7 +99,12 @@ mod approval_tests {
 
     #[test]
     fn policy_gates_known_tools() {
-        let p = ApprovalPolicy { write_file: false, run_command: true, read_file: true };
+        let p = ApprovalPolicy {
+            full_access: false,
+            write_file: false,
+            run_command: true,
+            read_file: true,
+        };
         assert!(!p.needs_approval("write_file", None));
         assert!(!p.needs_approval("apply_patch", None));
         assert!(p.needs_approval("run_command", None));
@@ -94,8 +113,29 @@ mod approval_tests {
 
     #[test]
     fn unknown_tools_default_to_safe() {
-        let p = ApprovalPolicy::default();
+        let p = ApprovalPolicy {
+            full_access: false,
+            ..ApprovalPolicy::default()
+        };
         assert!(p.needs_approval("some_mcp__tool", None));
+    }
+
+    #[test]
+    fn full_access_skips_every_gate() {
+        let p = ApprovalPolicy {
+            full_access: true,
+            write_file: true,
+            run_command: true,
+            read_file: true,
+        };
+        for tool in ["write_file", "apply_patch", "run_command", "read_file", "mcp__x"] {
+            assert!(!p.needs_approval(tool, None), "{tool} should be ungated");
+        }
+    }
+
+    #[test]
+    fn default_policy_is_full_access() {
+        assert!(ApprovalPolicy::default().full_access);
     }
 }
 
@@ -182,6 +222,11 @@ pub struct Settings {
     pub compaction: CompactionConfig,
     #[serde(default = "default_max_iterations")]
     pub max_iterations: u32,
+    /// When `true`, the transcript lists every read/write/tool action.
+    /// Defaults to `false`: actions stay out of the chat and the agent shows a
+    /// single summary once the turn finishes.
+    #[serde(default)]
+    pub show_tool_activity: bool,
     /// Auto-check GitHub for updates on launch.
     #[serde(default = "default_true")]
     pub auto_check_updates: bool,
@@ -204,7 +249,7 @@ fn default_language() -> String {
     "en".into()
 }
 fn default_max_iterations() -> u32 {
-    25
+    50
 }
 
 impl Default for Settings {
@@ -219,6 +264,7 @@ impl Default for Settings {
             approval: ApprovalPolicy::default(),
             compaction: CompactionConfig::default(),
             max_iterations: default_max_iterations(),
+            show_tool_activity: false,
             auto_check_updates: true,
             last_update_check: 0,
             mcp_servers: vec![],
@@ -235,11 +281,23 @@ pub struct ConfigStore {
 
 impl ConfigStore {
     pub fn load(path: PathBuf) -> Self {
-        let settings = match std::fs::read_to_string(&path) {
+        let mut settings = match std::fs::read_to_string(&path) {
             Ok(raw) => serde_json::from_str::<Settings>(&raw).unwrap_or_default(),
             Err(_) => Settings::default(),
         };
-        Self { path, inner: RwLock::new(settings) }
+        // v0.2.2 migration: the old default of 25 made longer coding turns
+        // stop early. Bump the untouched legacy default once and persist it.
+        let mut migrated = false;
+        if settings.max_iterations == 25 {
+            settings.max_iterations = default_max_iterations();
+            migrated = true;
+        }
+        let store = Self { path, inner: RwLock::new(settings) };
+        if migrated {
+            let snapshot = store.get();
+            let _ = store.persist(&snapshot);
+        }
+        store
     }
 
     pub fn get(&self) -> Settings {

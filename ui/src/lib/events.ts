@@ -7,6 +7,8 @@ import { useSettingsStore } from "./store";
 import type {
   ApprovalRequestEvent,
   CompactedEvent,
+  NoticeEvent,
+  PhaseEvent,
   Plan,
   ToolCallEvent,
   ToolResultEvent,
@@ -29,6 +31,15 @@ export async function subscribeToAgentEvents(): Promise<UnlistenFn> {
     }),
     listen<ToolResultEvent>("ai://tool-result", (e) => {
       store().pushToolResult(e.payload);
+    }),
+    listen<PhaseEvent>("ai://phase", (e) => {
+      store().upsertPhase(e.payload);
+    }),
+    listen<NoticeEvent>("ai://notice", (e) => {
+      store().setNotice({
+        kind: e.payload.kind ?? "info",
+        message: e.payload.message,
+      });
     }),
     listen<ApprovalRequestEvent>("ai://approval-request", (e) => {
       store().setApproval(e.payload);
