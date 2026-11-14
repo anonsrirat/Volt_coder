@@ -92,8 +92,10 @@ export function ChatPanel() {
   const noticeText =
     notice?.kind === "max_iterations"
       ? t("notice.max_iterations")
-      : notice?.kind === "loop_guard"
-        ? t("notice.loop_guard")
+      : notice?.kind === "safety_limit"
+        ? t("notice.safety_limit")
+        : notice?.kind === "loop_guard"
+          ? t("notice.loop_guard")
         : notice?.kind === "cancelled"
           ? t("notice.cancelled")
           : notice

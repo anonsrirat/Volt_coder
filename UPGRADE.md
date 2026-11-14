@@ -1,4 +1,21 @@
-# ⚡ Volt v0.2 — Upgrade Guide
+# ⚡ Volt v0.2.3 — Upgrade Guide
+
+## 0. 🚀 The agent now finishes the job by itself (v0.2.3)
+
+- The step limit no longer stops your turn. Volt **auto-continues** until the
+  task is done, a loop is detected, or you stop it — no more typing
+  *"ทำต่อ" / "continue"*.
+- **Settings → Agent → Steps before auto-continue** sets the work-window size
+  (10–300, default 100). Volt runs up to 8 windows as a runaway guard, so a
+  normal task never hits a wall.
+- Legacy values of `25` / `50` are migrated to `100` on first launch.
+
+**Files:** `src-tauri/src/agent/mod.rs`, `src-tauri/src/config.rs`,
+`src-tauri/src/agent/prompt.rs`, `ui/src/components/GeneralTab.tsx`
+
+---
+
+# Volt v0.2 — Upgrade Guide
 
 What changed since v0.1 and how to make the new features work.
 

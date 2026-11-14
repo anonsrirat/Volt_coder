@@ -1,4 +1,30 @@
-# ⚡ Volt v0.2.2 — Release Notes
+# ⚡ Volt v0.2.3 — Release Notes
+
+**Release date:** 2026-11-14
+**Focus:** one command finishes the whole job — no more stopping to ask you to
+"continue".
+
+---
+
+## 🚀 Fixed: it no longer stops and blocks your work
+
+Volt used to end a turn when it hit the step limit, showing **`max iterations
+reached`** and leaving you to type *"ทำต่อ" / "continue"* yourself. That is gone.
+
+- **Auto-continue** — reaching the step budget is now only a *checkpoint*.
+  Volt rolls into a fresh window and keeps working **automatically**.
+- A turn ends only when the task is actually **done**, a **loop** is detected,
+  or **you** stop it.
+- The system prompt now instructs the model to work **autonomously to
+  completion** and never pause to ask for confirmation.
+- A runaway guard still exists (window × 8) but a normal task never reaches it.
+- **Settings → Agent → Steps before auto-continue** (10–300, default 100).
+  Legacy `25` / `50` values are migrated to `100`.
+- Tests: **25/25** passing (`cd src-tauri && cargo test`).
+
+---
+
+# Volt v0.2.2 — Release Notes
 
 **Release date:** 2026-11-13
 **Focus:** full-access autonomy, a stable agent loop, a live process Canvas and a

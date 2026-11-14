@@ -89,7 +89,9 @@ const en: Dict = {
   "general.compaction": "Context compaction",
   "general.compactionEnable": "Enable auto-compaction",
   "general.compactionThreshold": "Compact at",
-  "general.maxIterations": "Max agent iterations",
+  "general.maxIterations": "Steps before auto-continue",
+  "general.maxIterationsHint":
+    "Volt keeps working automatically — it stops only when the task is done, a loop is detected, or you stop it.",
   "general.autoUpdate": "Check for updates on launch",
   // mcp
   "mcp.add": "Add server",
@@ -140,7 +142,9 @@ const en: Dict = {
   "summary.reads": "{n} reads",
   "summary.searches": "{n} searches",
   "summary.other": "{n} other",
-  "notice.max_iterations": "Reached the step limit for this turn — stopping. Ask me to continue if you need more.",
+  "notice.max_iterations": "Reached the step limit for this turn — continuing automatically.",
+  "notice.safety_limit":
+    "Reached the hard step limit for this turn — stopping. This is only a runaway guard; normal tasks finish long before this.",
   "notice.loop_guard": "Stopped because the same action kept repeating. Tell me how you'd like to proceed.",
   "notice.cancelled": "Stopped.",
   "notice.info": "{message}",
@@ -221,7 +225,9 @@ const th: Dict = {
   "general.compaction": "การย่อบริบท",
   "general.compactionEnable": "เปิดการย่อบริบทอัตโนมัติ",
   "general.compactionThreshold": "ย่อเมื่อใช้ถึง",
-  "general.maxIterations": "จำนวนรอบสูงสุดของเอเจนต์",
+  "general.maxIterations": "จำนวนรอบก่อนทำงานต่ออัตโนมัติ",
+  "general.maxIterationsHint":
+    "Volt จะทำงานต่อเนื่องเองอัตโนมัติ — จะหยุดก็ต่อเมื่องานเสร็จ, ตรวจพบลูป หรือคุณกดหยุดเอง",
   "general.autoUpdate": "ตรวจหาอัปเดตเมื่อเปิดโปรแกรม",
   "mcp.add": "เพิ่มเซิร์ฟเวอร์",
   "mcp.empty": "ยังไม่มีเซิร์ฟเวอร์ MCP เชื่อมต่อเครื่องมืออย่าง filesystem, git หรือ fetch",
@@ -267,7 +273,8 @@ const th: Dict = {
   "summary.reads": "{n} ครั้งที่อ่าน",
   "summary.searches": "{n} ครั้งที่ค้นหา",
   "summary.other": "อื่นๆ {n}",
-  "notice.max_iterations": "ถึงขีดจำกัดของรอบในเทิร์นนี้แล้ว — หยุดตรงนี้ บอกให้ทำต่อได้เลยถ้าต้องการ",
+  "notice.max_iterations": "ครบขีดจำกัดของรอบในเทิร์นนี้แล้ว — ทำงานต่ออัตโนมัติ",
+  "notice.safety_limit": "ถึงขีดจำกัดสูงสุดของรอบในเทิร์นนี้แล้ว — หยุดตรงนี้ ซึ่งเป็นแค่ตัวกันกรณีสุดโต่ง งานปกติจะเสร็จก่อนถึงตรงนี้",
   "notice.loop_guard": "หยุดเพราะการกระทำเดิมซ้ำหลายครั้ง บอกได้เลยว่าอยากให้ดำเนินการต่ออย่างไร",
   "notice.cancelled": "หยุดแล้ว",
   "notice.info": "{message}",

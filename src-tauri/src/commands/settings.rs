@@ -44,7 +44,7 @@ pub fn update_settings(patch: SettingsPatch, state: State<'_, Arc<AppState>>) ->
             s.language = v;
         }
         if let Some(v) = patch.max_iterations {
-            s.max_iterations = v.clamp(5, 200);
+            s.max_iterations = v.clamp(10, 300);
         }
         if let Some(v) = patch.show_tool_activity {
             s.show_tool_activity = v;

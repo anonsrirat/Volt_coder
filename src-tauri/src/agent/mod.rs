@@ -115,6 +115,13 @@ pub struct AgentLoop {
     pub cancel: CancellationToken,
 }
 
+/// Absolute safety ceiling for a single turn.
+///
+/// `max_iterations` is a *work window* that auto-continues; this constant caps
+/// the total number of windows so a pathological agent loop cannot run forever.
+/// Real tasks finish long before it — it only exists as a runaway guard.
+const MAX_WINDOWS: u32 = 8;
+
 impl AgentLoop {
     /// Run one user turn to completion, emitting events to the UI.
     pub async fn run(&self, session_id: &str, user_text: &str, _provider_id: &str) -> Result<()> {
@@ -150,6 +157,10 @@ impl AgentLoop {
         }
 
         let mut iteration = 0;
+        // Steps used in the current work window, and how many windows we have
+        // already auto-continued through.
+        let mut window_steps = 0u32;
+        let mut windows = 0u32;
         // Guard against a model that keeps replaying the exact same tool call.
         let mut last_signature: Option<String> = None;
         let mut repeats = 0u32;
@@ -171,22 +182,35 @@ impl AgentLoop {
                 self.emit("ai://done", serde_json::json!({ "session_id": session_id }));
                 return Ok(());
             }
-            if iteration >= self.max_iterations {
-                // A hard error here used to leave a scary "max iterations
-                // reached" banner in the chat. Treat the limit as a normal
-                // stop: report a friendly notice and finish the turn.
-                self.emit_phase(session_id, "run", "done", "", "done");
-                self.emit(
-                    "ai://notice",
-                    serde_json::json!({
-                        "session_id": session_id,
-                        "kind": "max_iterations",
-                        "message": format!("stopped after {} steps", self.max_iterations),
-                    }),
-                );
-                self.emit("ai://done", serde_json::json!({ "session_id": session_id }));
-                return Ok(());
+
+            // Auto-continue: hitting the window budget is a checkpoint, not the
+            // end of the turn. The user wants ONE command to finish the job, so
+            // we roll into a fresh window instead of stopping and asking for
+            // "continue". The turn only ends on completion / loop / cancel.
+            if window_steps >= self.max_iterations {
+                if windows + 1 >= MAX_WINDOWS {
+                    // Absolute safety net for a runaway agent.
+                    self.emit_phase(session_id, "run", "done", "", "done");
+                    self.emit(
+                        "ai://notice",
+                        serde_json::json!({
+                            "session_id": session_id,
+                            "kind": "safety_limit",
+                            "message": "reached the hard step limit",
+                        }),
+                    );
+                    self.emit("ai://done", serde_json::json!({ "session_id": session_id }));
+                    return Ok(());
+                }
+                windows += 1;
+                window_steps = 0;
+                // Leave a short "continuing" row in the Canvas timeline so it is
+                // obvious the run is still going (never a stuck spinner).
+                let id = format!("auto-{windows}");
+                self.emit_phase(session_id, &id, "working", "continuing", "running");
+                self.emit_phase(session_id, &id, "working", "continuing", "done");
             }
+            window_steps += 1;
             iteration += 1;
 
             let think_id = format!("think-{iteration}");

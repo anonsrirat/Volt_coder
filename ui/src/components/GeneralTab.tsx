@@ -153,14 +153,17 @@ export function GeneralTab() {
           </div>
           <input
             type="range"
-            min={5}
-            max={120}
-            step={5}
+            min={10}
+            max={300}
+            step={10}
             value={local.max_iterations}
             onChange={(e) => setLocal({ ...local, max_iterations: Number(e.target.value) })}
             onMouseUp={() => patch({ max_iterations: local.max_iterations })}
             className="w-full accent-[var(--accent)]"
           />
+          <p className="text-[11px] tx-faint leading-snug mt-1.5">
+            {t("general.maxIterationsHint")}
+          </p>
         </div>
         <Toggle
           label={t("general.autoUpdate")}

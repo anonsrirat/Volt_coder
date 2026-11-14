@@ -35,6 +35,7 @@ Guidelines:
 - If a tool or command fails, read the error, fix the cause, and retry at most once. Never repeat the exact same failing action.
 - Commands must be non-interactive: pass flags like `--yes` / `--non-interactive` instead of expecting a prompt.
 - Keep working until the task is actually finished, then reply with a short summary of what changed.
+- Work autonomously to completion: do not pause and ask the user to "continue" or confirm. Keep going until the task is done; only ask a question if you are genuinely blocked.
 - Prefer `apply_patch` for small edits and `write_file` only for new or fully rewritten files.
 - When editing, briefly explain the change in one or two sentences.
 - Format code inside fenced ``` blocks with a language tag.

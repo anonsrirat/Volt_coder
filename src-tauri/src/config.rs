@@ -248,8 +248,35 @@ fn default_accent() -> u32 {
 fn default_language() -> String {
     "en".into()
 }
+/// The default size of a single "work window": the number of steps Volt runs
+/// before it **automatically continues** into a fresh window. Reaching the
+/// window is a checkpoint, not the end of the turn — so one command can finish
+/// a long task without the user having to type "continue".
+///
+/// The turn only truly stops when the model reports the task is done, a loop
+/// guard fires, the user cancels, or the absolute safety ceiling is hit.
 fn default_max_iterations() -> u32 {
-    50
+    100
+}
+
+/// Apply one-time migrations to a loaded settings document.
+///
+/// Returns `true` when something changed and should be persisted.
+fn migrate(settings: &mut Settings) -> bool {
+    let mut changed = false;
+    // v0.2.3: the agent now auto-continues, so the old small step defaults
+    // (25, then 50) no longer make sense as a limit. Bump untouched legacy
+    // values once.
+    if matches!(settings.max_iterations, 25 | 50) {
+        settings.max_iterations = default_max_iterations();
+        changed = true;
+    }
+    // Never allow an absurdly small window (older files could be 5).
+    if settings.max_iterations < 10 {
+        settings.max_iterations = 10;
+        changed = true;
+    }
+    changed
 }
 
 impl Default for Settings {
@@ -285,13 +312,7 @@ impl ConfigStore {
             Ok(raw) => serde_json::from_str::<Settings>(&raw).unwrap_or_default(),
             Err(_) => Settings::default(),
         };
-        // v0.2.2 migration: the old default of 25 made longer coding turns
-        // stop early. Bump the untouched legacy default once and persist it.
-        let mut migrated = false;
-        if settings.max_iterations == 25 {
-            settings.max_iterations = default_max_iterations();
-            migrated = true;
-        }
+        let migrated = migrate(&mut settings);
         let store = Self { path, inner: RwLock::new(settings) };
         if migrated {
             let snapshot = store.get();
@@ -369,4 +390,37 @@ pub fn bootstrap(_app: &tauri::AppHandle) -> Result<()> {
     std::fs::create_dir_all(&dir)?;
     tracing::info!("config dir: {}", dir.display());
     Ok(())
+}
+
+#[cfg(test)]
+mod settings_tests {
+    use super::*;
+
+    #[test]
+    fn default_window_is_100() {
+        assert_eq!(default_max_iterations(), 100);
+    }
+
+    #[test]
+    fn legacy_defaults_are_migrated() {
+        for legacy in [25, 50] {
+            let mut s = Settings { max_iterations: legacy, ..Settings::default() };
+            assert!(migrate(&mut s), "legacy {legacy} should migrate");
+            assert_eq!(s.max_iterations, 100);
+        }
+    }
+
+    #[test]
+    fn explicit_values_are_kept() {
+        let mut s = Settings { max_iterations: 120, ..Settings::default() };
+        assert!(!migrate(&mut s));
+        assert_eq!(s.max_iterations, 120);
+    }
+
+    #[test]
+    fn tiny_values_get_a_floor() {
+        let mut s = Settings { max_iterations: 3, ..Settings::default() };
+        assert!(migrate(&mut s));
+        assert_eq!(s.max_iterations, 10);
+    }
 }
